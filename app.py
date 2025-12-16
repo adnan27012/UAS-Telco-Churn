@@ -74,10 +74,29 @@ def user_input_features():
 # Eksekusi Input
 input_df = user_input_features()
 
-# 5. Review Data (Main Panel)
+# 5. Review Data (Main Panel) - DIPERBAIKI (SPLIT 2 KOLOM)
 st.subheader("Tinjauan Data Input")
-with st.expander("Lihat Detail Data", expanded=True):
-    st.dataframe(input_df)
+
+with st.expander("Lihat Detail Data (Klik untuk membuka)", expanded=True):
+    # Ubah dataframe menjadi vertikal (Transpose)
+    df_transposed = input_df.T
+    df_transposed.columns = ["Value"] # Beri nama kolom
+
+    # Bagi menjadi 2 Kolom Tampilan
+    col_kiri, col_kanan = st.columns(2)
+
+    # Tentukan titik tengah untuk membagi data
+    half_point = 10 
+
+    with col_kiri:
+        st.markdown("**📂 Profil & Layanan Dasar**")
+        # Tampilkan separuh data pertama
+        st.table(df_transposed.iloc[:half_point])
+
+    with col_kanan:
+        st.markdown("**💳 Layanan Tambahan & Akun**")
+        # Tampilkan separuh data sisanya
+        st.table(df_transposed.iloc[half_point:])
 
 # 6. Logika Prediksi
 if st.button("Proses Analisis", type="primary"):
