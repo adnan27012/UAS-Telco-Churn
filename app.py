@@ -1,31 +1,45 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import numpy as np
 
-# 1. Load Model
+# 1. Konfigurasi Halaman (Page Config)
+st.set_page_config(
+    page_title="Telco Churn Prediction System",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 2. Load Model
 try:
     model = joblib.load('model_churn_terbaik.pkl')
 except FileNotFoundError:
-    st.error("File model tidak ditemukan! Pastikan 'model_churn_terbaik.pkl' ada satu folder dengan app.py")
+    st.error("Critical Error: Model file 'model_churn_terbaik.pkl' not found in the directory.")
     st.stop()
 
-# 2. Judul Web
-st.set_page_config(page_title="Prediksi Telco Churn", layout="wide")
-st.title(" Aplikasi Prediksi Churn Pelanggan")
+# 3. Header Utama
+st.title("Sistem Prediksi Churn Pelanggan")
+st.markdown("""
+Aplikasi ini menggunakan algoritma Machine Learning untuk memprediksi probabilitas pelanggan berhenti berlangganan (Churn).
+Silakan masukkan parameter pelanggan pada panel di sebelah kiri untuk memulai analisis.
+""")
 st.markdown("---")
 
-# 3. Sidebar Input
-st.sidebar.header(" Masukkan Data Pelanggan")
+# 4. Sidebar Input
+st.sidebar.title("Parameter Input")
+st.sidebar.info("Sesuaikan parameter di bawah ini dengan profil pelanggan.")
 
 def user_input_features():
-    # -- Demografi --
+    # Group 1: Demografi
+    st.sidebar.subheader("Profil Demografi")
     gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
-    senior = st.sidebar.selectbox("Senior Citizen", [0, 1], format_func=lambda x: "Ya" if x==1 else "Tidak")
+    senior = st.sidebar.selectbox("Senior Citizen", [0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
     partner = st.sidebar.selectbox("Partner", ["Yes", "No"])
     dependents = st.sidebar.selectbox("Dependents", ["Yes", "No"])
 
-    # -- Layanan --
-    tenure = st.sidebar.slider("Lama Langganan (Bulan)", 0, 72, 12)
+    # Group 2: Layanan
+    st.sidebar.subheader("Layanan Berlangganan")
+    tenure = st.sidebar.number_input("Tenure (Bulan)", min_value=0, max_value=72, value=12)
     phone = st.sidebar.selectbox("Phone Service", ["Yes", "No"])
     multi_lines = st.sidebar.selectbox("Multiple Lines", ["No phone service", "No", "Yes"])
     internet = st.sidebar.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
@@ -36,16 +50,17 @@ def user_input_features():
     tv = st.sidebar.selectbox("Streaming TV", ["No internet service", "No", "Yes"])
     movies = st.sidebar.selectbox("Streaming Movies", ["No internet service", "No", "Yes"])
 
-    # -- Akun --
-    contract = st.sidebar.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
+    # Group 3: Akun & Pembayaran
+    st.sidebar.subheader("Informasi Akun")
+    contract = st.sidebar.selectbox("Contract Type", ["Month-to-month", "One year", "Two year"])
     paperless = st.sidebar.selectbox("Paperless Billing", ["Yes", "No"])
     payment = st.sidebar.selectbox("Payment Method", [
         "Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"
     ])
-    monthly = st.sidebar.number_input("Biaya Bulanan ($)", min_value=0.0, value=50.0)
-    total = st.sidebar.number_input("Total Biaya ($)", min_value=0.0, value=0.0)
+    monthly = st.sidebar.number_input("Monthly Charges ($)", min_value=0.0, value=50.0)
+    total = st.sidebar.number_input("Total Charges ($)", min_value=0.0, value=0.0)
 
-    # Buat DataFrame
+    # Konstruksi DataFrame
     data = {
         'gender': gender, 'SeniorCitizen': senior, 'Partner': partner, 'Dependents': dependents,
         'tenure': tenure, 'PhoneService': phone, 'MultipleLines': multi_lines,
@@ -56,27 +71,43 @@ def user_input_features():
     }
     return pd.DataFrame(data, index=[0])
 
-# Tampilkan Data Input
+# Eksekusi Input
 input_df = user_input_features()
-st.subheader(" Data Pelanggan:")
-st.write(input_df)
 
-# 4. Prediksi
-if st.button("🔍 Prediksi Sekarang"):
+# 5. Review Data (Main Panel)
+st.subheader("Tinjauan Data Input")
+with st.expander("Lihat Detail Data", expanded=True):
+    st.dataframe(input_df)
+
+# 6. Logika Prediksi
+if st.button("Proses Analisis", type="primary"):
+    
+    # Melakukan Prediksi
     prediction = model.predict(input_df)
-
+    
+    # Mengambil Probabilitas (Jika didukung model)
     try:
-        # Coba ambil probabilitas jika model mendukung
         proba = model.predict_proba(input_df)
-        confidence = proba[0][prediction[0]] * 100
+        probability = np.max(proba) * 100
     except:
-        confidence = 0
+        probability = 0
 
-    st.subheader("💡 Hasil Analisis:")
-    if prediction[0] == 1:
-        st.error(f" CHURN DETECTED! Pelanggan ini berisiko tinggi berhenti berlangganan.")
-    else:
-        st.success(f" AMAN. Pelanggan ini diprediksi akan tetap setia.")
+    st.markdown("---")
+    st.subheader("Hasil Analisis")
 
-    if confidence > 0:
-        st.info(f"Tingkat Keyakinan Model: {confidence:.1f}%")
+    # Layout Kolom untuk Hasil
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if prediction[0] == 1:
+            st.error("Status: CHURN (Berisiko)")
+            st.markdown("**Kesimpulan:** Pelanggan memiliki indikasi tinggi untuk berhenti berlangganan.")
+        else:
+            st.success("Status: NON-CHURN (Aman)")
+            st.markdown("**Kesimpulan:** Pelanggan diprediksi akan tetap menggunakan layanan.")
+
+    with col2:
+        if probability > 0:
+            st.metric(label="Tingkat Keyakinan Model (Probability)", value=f"{probability:.2f}%")
+        else:
+            st.metric(label="Prediction Output", value=str(prediction[0]))
